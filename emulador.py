@@ -1,5 +1,5 @@
 from time import sleep
-from math import cos, pi
+from math import cos, pi, degrees
 import random
 
 class Drone:
@@ -30,8 +30,8 @@ class Drone:
     def cagada(self):
         if random.randint(0, 9) % 2 == 0:
             print("a camera do drone se apaixonou pelo furlas e mudou a direção do drone!\n")
-            self.posicao["x"] += 15
-            self.posicao["z"] += 20
+            self.posicao["x"] += random.randint(-50, 50)
+            self.posicao["z"] += random.randint(-50, 50)
 
 
     def calculo_lidar(self, lidar_type: str):
@@ -44,12 +44,12 @@ class Drone:
         #os calculos são um pouco difíceis de explicar... pergunta pro @lipedras      
         if lidar_type == "horizontal":
 
-            self.lidar_r = ((self.largura_corredor/2 - self.posicao["x"])/ cos(self.angulo_roll)) - (self.largura/2)
-            self.lidar_l = ((self.largura_corredor/2 - self.posicao["x"]) / cos(self.angulo_roll)) - (self.largura/2)
-            self.lidar_d = self.posicao["z"] / cos(self.angulo_roll)
+            self.lidar_r = abs(((self.largura_corredor/2 - self.posicao["x"])/ cos(self.angulo_roll)) - (self.largura/2))
+            self.lidar_l = abs(((self.largura_corredor/2 + self.posicao["x"]) / cos(self.angulo_roll)) - (self.largura/2))
+            self.lidar_d = abs(self.posicao["z"] / cos(self.angulo_roll))
 
         if lidar_type == "vertical":
-            self.lidar_d = self.posicao["z"] / cos(self.angulo_pitch)
+            self.lidar_d = abs(self.posicao["z"] / cos(self.angulo_pitch))
 
 
     def stabilize(self):
@@ -99,7 +99,7 @@ class Drone:
             self.state_horizontal = None
             self.angulo_roll = 0
             self.calculo_lidar(lidar_type="horizontal")
-            print(f"drone estabilizado!\nposicao: {self.posicao}\nlidars: d: {self.lidar_d} | l: {self.lidar_l} | r: {self.lidar_r}\n")
+            print(f"drone roll estabilizado!\nposicao: {self.posicao}\nlidars: d: {self.lidar_d} | l: {self.lidar_l} | r: {self.lidar_r}\n")
         sleep(2)
 
         #caso2: o drone se movimenta verticalmente e indevidamente
@@ -142,7 +142,7 @@ class Drone:
             self.calculo_lidar(lidar_type="vertical")
 
 
-            print(f"drone estabilizado!\nposicao: {self.posicao}\nlidars: d: {self.lidar_d} | l: {self.lidar_l} | r: {self.lidar_r}\n")
+            print(f"Altura do drone estabilizada!\nposicao: {self.posicao}\nlidars: d: {self.lidar_d} | l: {self.lidar_l} | r: {self.lidar_r}\n")
         print("Drone estável!\n")
 
 
@@ -182,7 +182,7 @@ class Drone:
             self.cagada()
             self.stabilize()
             sleep(2)
-        print("Etapa 0 concluida...")
+        print("Estado 0 concluido!")
         print(f"lidars:\nd: {self.lidar_d}\nl: {self.lidar_l}\nr: {self.lidar_r}\n")       
         sleep(3)
 
@@ -207,7 +207,7 @@ class Drone:
         self.angulo_pitch = 0.0
         self.calculo_lidar(lidar_type="vertical")
         
-        print("Etapa 1 concluida...")
+        print("Estado 1 concluido!")
         print(f"lidars:\nd: {self.lidar_d}\nl: {self.lidar_l}\nr: {self.lidar_r}\n")
         sleep(3)
 
@@ -215,9 +215,77 @@ class Drone:
     def para_direita(self):
 
         #definindo velocidades e estados
+        print("Estado 2: movendo para a direita")
+        self.angulo_roll = - pi/18
+        self.side_velocity = 5.0
+        self.state_horizontal = "moving"
+        self.calculo_lidar(lidar_type="horizontal")
+
+        #movendo
+        while self.posicao["x"] < 15:
+            self.last_posicao = self.posicao.copy()
+            self.posicao["x"] += self.side_velocity
+            self.calculo_lidar(lidar_type="horizontal")
+            print(f"lidars:\nd: {self.lidar_d}\nl: {self.lidar_l}\nr: {self.lidar_r}\nposicao: {self.posicao}\n")
+            sleep(1)
+        
+        #reset para o 0
+        self.angulo_roll = 0
+        self.side_velocity = 0
+        self.state_horizontal = None
+        self.calculo_lidar(lidar_type="horizontal")
+
+        print("Estado 2 concluido!")
+        print(f"lidars:\nd: {self.lidar_d}\nl: {self.lidar_l}\nr: {self.lidar_r}\nposicao: {self.posicao}\n")
+        sleep(3)
+
+
+    def flip(self):
+        if abs(self.posicao["x"]) < 10:
+
+            #definindo velocidades e estados
+            print("iniciando o flip...")
+            self.pitch_velocity = pi / 5
+            self.state_vertical = "moving"
+            self.vertical_velocity = - 10
+
+            #movendo
+            while self.angulo_pitch < 2 * pi:
+                self.angulo_pitch += self.pitch_velocity
+                self.last_posicao = self.posicao.copy()
+                #self.posicao["z"] += self.vertical_velocity
+                self.calculo_lidar(lidar_type="vertical")
+                print(f"lidars:\nd: {self.lidar_d}\nl: {self.lidar_l}\nr: {self.lidar_r}\nposicao: {self.posicao}\nangulação pitch: {degrees(self.angulo_pitch)}")
+                sleep(0.1)
+            
+            #reset para 0
+            self.pitch_velocity = 0
+            self.angulo_pitch = 0
+            self.vertical_velocity = 0
+            self.state_vertical = None
+            self.calculo_lidar(lidar_type="vertical")
+            print("flip concluido!")
+            print(f"lidars:\nd: {self.lidar_d}\nl: {self.lidar_l}\nr: {self.lidar_r}\nposicao: {self.posicao}\n")
+
+
+        else:
+            print("os sensores identificaram que o drone está próximo demais da parede para realizar o flip.")
+            print("ponto estável settado para X: 0 ")
+            self.last_posicao["x"] = 0.0
+            self.stabilize()
+            self.flip()
+
+
+    def lan(self):
+        print("Estado 4: landing...")
+
+        #definindo valores para a centralização
         pass
+
 
 drone_1 = Drone()
 drone_1.takeoff(150.0)
 drone_1.parado()
 drone_1.para_frente()
+drone_1.para_direita()
+drone_1.flip()

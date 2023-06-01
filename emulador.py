@@ -1,6 +1,21 @@
 from time import sleep
 from math import cos, pi, degrees
 import random
+import numpy as np
+
+
+def controle(obj, atual, inicial):
+    maxi = (obj - inicial)/2
+    pcent = 1 - ((atual - inicial)/(obj-inicial))
+    if pcent < 0.1:
+        pcent = 0.1
+        print('Drone movendo em velocidade baixa')
+        sleep(2)
+    else:
+        print('Drone movendo em velocidade normal')
+        sleep(1)
+    vel = maxi*pcent
+    return vel  
 
 class Drone:
     def __init__(self):
@@ -16,7 +31,7 @@ class Drone:
         self.lidar_r = float(35)
         self.lidar_l = self.largura_corredor - self.largura - self.lidar_r
         self.lidar_d = self.posicao["z"]
-        self.camera = None
+        self.camera = 0
 
         #ações
         self.state_horizontal = None
@@ -27,11 +42,24 @@ class Drone:
         self.forward_velocity = 0.0
 
 
+    def atualizaCam(self):
+        print("Atualizando a camera que tudo vê...")
+        #leva em conta os possiveis valores de value do HSV 
+        matriz_aleatoria = np.random.randint(1, 101, size =(5,5))
+        for linha in matriz_aleatoria:
+            for elemento in linha:
+                print(elemento, end=' ')
+            print()
+        self.camera = np.mean(matriz_aleatoria)
+        sleep(1)
+
+
     def cagada(self):
         if random.randint(0, 9) % 2 == 0:
             print("a camera do drone se apaixonou pelo furlas e mudou a direção do drone!\n")
             self.posicao["x"] += random.randint(-50, 50)
             self.posicao["z"] += random.randint(-50, 50)
+            self.atualizaCam()
 
 
     def calculo_lidar(self, lidar_type: str):
@@ -71,6 +99,7 @@ class Drone:
                     self.angulo_roll =  pi/6
 
 
+
             #caso1 - B -> a variação é grande, logo a velocidade do ajuste deve ser suficiente para corrigir a posição em 2s
             if abs(tamanho_da_cagada) > 10.0:
 
@@ -82,18 +111,21 @@ class Drone:
                     self.angulo_roll =  pi / 3
 
 
+
             #o laço a seguir é o responsável pela simulação do movimento, note que nele há um IF criando a condição de escape para cobrir as imprecisões do drone.
             print("corrigindo a posição...")
             while self.posicao["x"] != self.last_posicao["x"]:
 
                 self.posicao["x"] += self.side_velocity
                 self.calculo_lidar(lidar_type="horizontal")
-
                 print(f"posicao: {self.posicao}")
-                
                 sleep(1)
 
                 if abs(self.posicao["x"] - self.last_posicao["x"]) < 5:
+                    while (self.camera%2) == 0: #lipe, tentei fzr com que caisse mais vzs so pra mostrar o print, mas n consegui :(
+                        print("A camera perdeu a mao, corrigindo...")
+                        sleep(0.5)
+                        self.atualizaCam()
                     break
             self.side_velocity = 0
             self.state_horizontal = None
@@ -134,6 +166,10 @@ class Drone:
                 sleep(1)
 
                 if abs(self.posicao["z"] - self.last_posicao["z"]) < 5:
+                    while (self.camera%2)  == 0:
+                        print("A camera perdeu a mao, corrigindo...")
+                        sleep(0.5)
+                        self.atualizaCam()
                     break
 
 
@@ -151,15 +187,15 @@ class Drone:
         #definição de estado e velocidade // não é necessária nenhuma angulação para o take off, basta acelerar os motores.
         print("Estado -1: Taking Off\n")
         self.state_vertical = "moving"
-        self.vertical_velocity = 15.0
-
+        self.last_posicao = self.posicao.copy()
 
         #note que não foi necessária uma condição de escape, no caso do drone não ficar precisamente com 150 de altura, pois o "<" já inclui essa margem.
-        while self.posicao["z"] < altura:
-            self.last_posicao = self.posicao.copy()
-            self.posicao["z"] += self.vertical_velocity
+        while self.posicao["z"] < altura: 
+            self.vertical_velocity = controle(altura, self.posicao['z'], self.last_posicao['z'])
+            self.posicao["z"] += self.vertical_velocity 
             self.calculo_lidar(lidar_type="vertical")
             print(f"lidar_d: {self.lidar_d}\nposicao: {self.posicao}\n")
+            self.atualizaCam()
             sleep(1)
         
         self.last_posicao = self.posicao.copy()
@@ -187,43 +223,47 @@ class Drone:
         sleep(3)
 
 
-    def para_frente(self):
+    def para_frente(self, obj):
 
         #definindo velocidades e estados // NOTA P/ GABS -> vamos add um modelo para o Y?
         print("Estado 1: movendo para frente")
-        self.forward_velocity = 15.0
         self.angulo_pitch = pi / 4
+        self.last_posicao = self.posicao.copy()
         self.calculo_lidar(lidar_type="vertical")
 
         #da mesma forma que o loop de take off, aqui não foi necessário escape. Denota-se que aqui não há variação nos estados, nem fator de estabilização
-        while self.posicao["y"] < 50.0:
-            self.last_posicao = self.posicao.copy()
+        while self.posicao["y"] < obj:
+            self.forward_velocity = controle(obj, self.posicao['y'], self.last_posicao['y'])
             self.posicao["y"] += self.forward_velocity
             print(f"lidar_d: {self.lidar_d}\nposicao: {self.posicao}\n")
+            self.atualizaCam()
             sleep(1)
 
         #redefinindo as velocidades e angulações
         self.forward_velocity = 0.0
         self.angulo_pitch = 0.0
         self.calculo_lidar(lidar_type="vertical")
+
+        self.cagada()
+        self.stabilize()
         
         print("Estado 1 concluido!")
         print(f"lidars:\nd: {self.lidar_d}\nl: {self.lidar_l}\nr: {self.lidar_r}\n")
         sleep(3)
 
     
-    def para_direita(self):
+    def para_direita(self, obj):
 
         #definindo velocidades e estados
         print("Estado 2: movendo para a direita")
         self.angulo_roll = - pi/18
-        self.side_velocity = 5.0
         self.state_horizontal = "moving"
+        self.last_posicao = self.posicao.copy()
         self.calculo_lidar(lidar_type="horizontal")
 
         #movendo
-        while self.posicao["x"] < 15:
-            self.last_posicao = self.posicao.copy()
+        while self.posicao["x"] < obj:
+            self.side_velocity = controle(obj, self.posicao['x'], self.last_posicao['x'])
             self.posicao["x"] += self.side_velocity
             self.calculo_lidar(lidar_type="horizontal")
             print(f"lidars:\nd: {self.lidar_d}\nl: {self.lidar_l}\nr: {self.lidar_r}\nposicao: {self.posicao}\n")
@@ -234,6 +274,9 @@ class Drone:
         self.side_velocity = 0
         self.state_horizontal = None
         self.calculo_lidar(lidar_type="horizontal")
+
+        self.cagada()
+        self.stabilize()
 
         print("Estado 2 concluido!")
         print(f"lidars:\nd: {self.lidar_d}\nl: {self.lidar_l}\nr: {self.lidar_r}\nposicao: {self.posicao}\n")
@@ -286,6 +329,6 @@ class Drone:
 drone_1 = Drone()
 drone_1.takeoff(150.0)
 drone_1.parado()
-drone_1.para_frente()
-drone_1.para_direita()
+drone_1.para_frente(50)
+drone_1.para_direita(15)
 drone_1.flip()

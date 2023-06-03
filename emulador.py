@@ -3,7 +3,7 @@ from math import cos, pi, degrees
 import random
 import numpy as np
 
-
+#essa função de controle tira um percentual em relação ao objetivo e qaunto ainda precisa andar, movendo mais devagar ou em velocidade normal
 def controle(obj, atual, inicial):
     maxi = (obj - inicial)/2
     pcent = 1 - ((atual - inicial)/(obj-inicial))
@@ -42,6 +42,7 @@ class Drone:
         self.forward_velocity = 0.0
 
 
+
     def atualizaCam(self):
         print("Atualizando a camera que tudo vê...")
         #leva em conta os possiveis valores de value do HSV 
@@ -50,7 +51,7 @@ class Drone:
             for elemento in linha:
                 print(elemento, end=' ')
             print()
-        self.camera = np.mean(matriz_aleatoria)
+        self.camera = np.mean(matriz_aleatoria) #o self.camera vai receber so a media pra ser realizado os calc
         sleep(1)
 
 
@@ -166,7 +167,7 @@ class Drone:
                 sleep(1)
 
                 if abs(self.posicao["z"] - self.last_posicao["z"]) < 5:
-                    while (self.camera%2)  == 0:
+                    while (self.camera%2)  == 0: #caso a camera nao esteja apontando a media da matriz correta, ela deve atualizar
                         print("A camera perdeu a mao, corrigindo...")
                         sleep(0.5)
                         self.atualizaCam()
@@ -322,9 +323,31 @@ class Drone:
     def lan(self):
         print("Estado 4: landing...")
 
-        #definindo valores para a centralização
-        pass
+        # não é necessária nenhuma angulação, basta diminuir a ação os motores.
+        self.state_vertical = "moving"
+        self.last_posicao = self.posicao.copy()
 
+        while self.posicao["z"] > 2: 
+            self.vertical_velocity = controle(0, self.posicao['z'], self.last_posicao['z'])
+            #caso a posição z for negativo, nao é realizado a conta e sai do loop 
+            if (self.posicao["z"] + self.vertical_velocity) < 0:
+                break
+            self.posicao["z"] += self.vertical_velocity
+            self.calculo_lidar(lidar_type="vertical")
+            print(f"lidar_d: {self.lidar_d}\nposicao: {self.posicao}\n")
+            self.atualizaCam()
+            sleep(1)
+        
+        #setando tudo pra zero
+        self.last_posicao = self.posicao.copy()
+        self.vertical_velocity = 0
+        self.side_velocity = 0.0
+        self.state_horizontal = None
+        self.state_vertical = None
+        self.state_vertical = None
+        self.camera = 0
+
+        print(f"Landing concluido! Altitude atual: {self.posicao['z']}")
 
 drone_1 = Drone()
 drone_1.takeoff(150.0)
@@ -332,3 +355,5 @@ drone_1.parado()
 drone_1.para_frente(50)
 drone_1.para_direita(15)
 drone_1.flip()
+drone_1.lan()
+print('\nTodos estados foram concluidos, pode guardar o drone, Lipinho.')

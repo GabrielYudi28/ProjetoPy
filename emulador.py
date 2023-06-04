@@ -320,7 +320,7 @@ class Drone:
             self.flip()
 
 
-    def lan(self):
+    def land(self):
         print("Estado 4: landing...")
 
         # não é necessária nenhuma angulação, basta diminuir a ação os motores.
@@ -355,5 +355,5 @@ drone_1.parado()
 drone_1.para_frente(50)
 drone_1.para_direita(15)
 drone_1.flip()
-drone_1.lan()
+drone_1.land()
 print('\nTodos estados foram concluidos, pode guardar o drone, Lipinho.')
